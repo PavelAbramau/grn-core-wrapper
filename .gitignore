@@ -1,0 +1,26 @@
+# Regenerable pipeline output (re-run Snakemake to recreate)
+/results/
+.snakemake/
+
+# Python / build artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editor
+.DS_Store
+*.swp
+*~
+.env
+.venv/
+
+# NOTE: data/fixtures/ and results_control/ are intentionally COMMITTED.
+# This repo is self-contained for CI — see README.md "Self-containment".
+# Largest committed files (~35 MB total):
+#   data/fixtures/ctx_db.regions_vs_motifs.rankings.feather  (~23 MB)
+#   data/fixtures/combined_GEX_ACC_mudata.h5mu               (~10 MB)
+#   data/fixtures/cistromes_{direct,extended}.h5ad           (~0.5 MB each)
+#   results_control/snakemake_10{a,b}_auc_*.h5mu             (~0.15 MB each)

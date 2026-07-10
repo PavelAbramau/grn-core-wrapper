@@ -1,0 +1,95 @@
+name: grn-core-wrapper CI
+
+# Runs the pruned 6-rule GRN-core Snakefile against the fixtures committed
+# in data/fixtures/, then checks its output against the control comparison
+# files committed in results_control/ (tests/compare_to_control.py).
+#
+# This workflow NEVER runs the excluded upstream rules (download_genome_
+# annotations, prepare_GEX_ACC_multiome, get_search_space,
+# motif_enrichment_cistarget, motif_enrichment_dem, prepare_menr,
+# scplus_mudata) -- see README.md "What this repo excludes". It does not
+# need network access to biomart/NCBI/cisTarget, and does not depend on the
+# parent scenicplus-validation-harness/ project existing.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  grn-core-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      # scenicplus's own pyproject.toml caps support at <=3.11.8, but its
+      # pinned snakemake==8.5.5 requires >=3.11 -- 3.11.8 exactly is the
+      # only version satisfying both (see ../environment-fixes/BUGS_FOUND.txt #1).
+      - name: Set up conda env (python + packages that can't build from source)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment/environment.yml
+          activate-environment: scenicplus
+          miniforge-version: latest
+
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('environment/requirements.txt') }}
+
+      - name: Install pinned dependency tree
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r environment/requirements.txt
+
+      - name: Install pybedtools (needs setuptools<70 + no build isolation, BUGS_FOUND.txt #2)
+        run: |
+          python -m pip install "setuptools<70"
+          python -m pip install --no-build-isolation "pybedtools==0.9.1"
+
+      - name: Install scenicplus (pinned commit, not on PyPI)
+        run: |
+          python -m pip install --no-deps \
+            "git+https://github.com/aertslab/scenicplus.git@840dab85de3044846234c157e327b6ea0290abfb"
+
+      - name: Sanity-check imports
+        run: |
+          python -c "
+          import importlib
+          for mod in ['scenicplus', 'scanpy', 'pycistarget', 'ctxcore', 'mudata', 'snakemake']:
+              m = importlib.import_module(mod)
+              print(f'{mod}: {getattr(m, \"__version__\", \"?\")} -- {getattr(m, \"__file__\", \"NAMESPACE PKG!\")}')"
+
+      - name: Confirm no upstream network dependency (fixtures must already exist)
+        run: |
+          test -f data/fixtures/combined_GEX_ACC_mudata.h5mu
+          test -f data/fixtures/search_space.tsv
+          test -f data/fixtures/cistromes_direct.h5ad
+          test -f data/fixtures/cistromes_extended.h5ad
+          test -f data/fixtures/tf_names.txt
+          test -f data/fixtures/ctx_db.regions_vs_motifs.rankings.feather
+          test -f results_control/snakemake_09a_eregulons_direct.tsv
+          test -f results_control/snakemake_09b_eregulons_extended.tsv
+          test -f results_control/snakemake_10a_auc_direct.h5mu
+          test -f results_control/snakemake_10b_auc_extended.h5mu
+
+      - name: Run pruned Snakefile
+        run: |
+          snakemake \
+            --snakefile workflow/Snakefile \
+            --configfile config/config.yaml \
+            --directory results \
+            --cores 2 -p
+
+      - name: Compare against control (exact-match gate)
+        run: python tests/compare_to_control.py
+
+      - name: Upload run output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grn-core-wrapper-results
+          path: results/

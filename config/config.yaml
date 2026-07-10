@@ -1,0 +1,57 @@
+# Config for the pruned 6-rule GRN-core Snakefile. input_data here points
+# at FROZEN FIXTURES (copied from a real Phase-1 run of the unmodified
+# scenicplus Snakemake pipeline, scenicplus-validation-harness/run/) instead
+# of at other rules' outputs -- there are no other rules in this Snakefile
+# to produce them.
+#
+# params_general/params_inference values are copied verbatim from
+# scenicplus-validation-harness/Snakemake/config/config.yaml (the adapted
+# Phase-1 config) so this run reproduces the exact same computation on the
+# exact same frozen inputs -- see tests/compare_to_control.py.
+#
+# scenicplus_pinned:
+#   This repo's fixtures and control comparison files were generated with
+#   this exact scenicplus build. scenicplus is not on PyPI -- installed
+#   from the aertslab/scenicplus GitHub source, pip-installed with --no-deps
+#   from a local checkout (see ../environment-fixes/README.md). A different
+#   commit could change tf_to_gene/region_to_gene/eGRN/AUCell behavior and
+#   invalidate the compare_to_control.py comparison.
+#   pip_version: "1.0a2"          # from `pip show scenicplus`
+#   git_commit: "840dab85de3044846234c157e327b6ea0290abfb"  # from `git log -1` in the scenicplus checkout
+#   git_describe: "v1.0a2-2-g840dab8"  # 2 commits past the v1.0a2 tag
+#   git_commit_date: "2026-01-16 14:46:10 +0100"
+
+input_data:
+  combined_GEX_ACC_mudata: "/Users/pavelabramau/Documents/scenicplus_claude/grn-core-wrapper/data/fixtures/combined_GEX_ACC_mudata.h5mu"
+  tf_names: "/Users/pavelabramau/Documents/scenicplus_claude/grn-core-wrapper/data/fixtures/tf_names.txt"
+  search_space: "/Users/pavelabramau/Documents/scenicplus_claude/grn-core-wrapper/data/fixtures/search_space.tsv"
+  cistromes_direct: "/Users/pavelabramau/Documents/scenicplus_claude/grn-core-wrapper/data/fixtures/cistromes_direct.h5ad"
+  cistromes_extended: "/Users/pavelabramau/Documents/scenicplus_claude/grn-core-wrapper/data/fixtures/cistromes_extended.h5ad"
+  ctx_db_fname: "/Users/pavelabramau/Documents/scenicplus_claude/grn-core-wrapper/data/fixtures/ctx_db.regions_vs_motifs.rankings.feather"
+
+output_data:
+  tf_to_gene_adjacencies: "tf_to_gene_adj.tsv"
+  region_to_gene_adjacencies: "region_to_gene_adj.tsv"
+  eRegulons_direct: "eRegulon_direct.tsv"
+  eRegulons_extended: "eRegulons_extended.tsv"
+  AUCell_direct: "AUCell_direct.h5mu"
+  AUCell_extended: "AUCell_extended.h5mu"
+
+params_general:
+  temp_dir: "/tmp/spx_grn_core_wrapper"
+  n_cpu: 2
+  seed: 666
+
+params_inference:
+  tf_to_gene_importance_method: "GBM"
+  region_to_gene_importance_method: "GBM"
+  region_to_gene_correlation_method: "SR"
+  order_regions_to_genes_by: "importance"
+  order_TFs_to_genes_by: "importance"
+  gsea_n_perm: 1000
+  quantile_thresholds_region_to_gene: "0.85 0.90 0.95"
+  top_n_regionTogenes_per_gene: "5 10 15"
+  top_n_regionTogenes_per_region: ""
+  min_regions_per_gene: 0
+  rho_threshold: 0.05
+  min_target_genes: 1

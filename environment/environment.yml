@@ -1,0 +1,19 @@
+# Conda environment for a working, verified scenicplus install.
+#
+# Covers only what conda needs to provide: the interpreter and the handful
+# of packages whose pip sdists fail to build from source on a stock
+# pip/setuptools/clang toolchain (see BUGS_FOUND.txt). Everything else comes
+# from requirements.txt via pip -- see README.md for the full sequence.
+name: scenicplus
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11.8  # exact patch version required -- see README.md and BUGS_FOUND.txt #1
+  - hdf5            # tables' source build needs local HDF5 headers (BUGS_FOUND.txt #3)
+  - pytables=3.9.2  # installed via conda: its pip sdist hits a clang error on modern toolchains (BUGS_FOUND.txt #3)
+  - pip
+  - setuptools
+  - wheel
+  - cython=0.29.37
+  - numpy=1.26.4
+  - pandas=1.5.0

@@ -1,0 +1,187 @@
+# Pruned validation harness: contains ONLY the 6 GRN-core rules copied
+# verbatim (shell commands unchanged) from the officially installed
+# scenicplus package's Snakefile
+# (<env_site_packages>/scenicplus/snakemake/Snakefile, mirrored unmodified
+# at scenicplus-validation-harness/Snakemake/workflow/Snakefile):
+#   tf_to_gene, region_to_gene, eGRN_direct, eGRN_extended,
+#   AUCell_direct, AUCell_extended
+#
+# Every other rule from the original DAG (prepare_GEX_ACC_multiome,
+# download_genome_annotations, get_search_space, motif_enrichment_cistarget,
+# motif_enrichment_dem, prepare_menr) is DELIBERATELY absent. Their outputs
+# are instead frozen, static fixture files copied from a real Phase-1 run
+# of the unmodified pipeline (scenicplus-validation-harness/run/) into
+# data/fixtures/ -- see config/config.yaml's input_data section. This
+# Snakefile will never invoke biomart, NCBI, MACS2, or any motif database
+# lookup; every job is deterministic given the frozen fixtures.
+
+configfile: "config/config.yaml"
+
+rule all:
+    input:
+        tf_to_gene_adjacencies=config["output_data"]["tf_to_gene_adjacencies"],
+        region_to_gene_adjacencies=config["output_data"]["region_to_gene_adjacencies"],
+        eRegulons_direct=config["output_data"]["eRegulons_direct"],
+        eRegulons_extended=config["output_data"]["eRegulons_extended"],
+        AUCell_direct=config["output_data"]["AUCell_direct"],
+        AUCell_extended=config["output_data"]["AUCell_extended"]
+
+rule tf_to_gene:
+    input:
+        multiome_mudata_fname=config["input_data"]["combined_GEX_ACC_mudata"],
+        tf_names=config["input_data"]["tf_names"],
+    output:
+        tf_to_gene_adjacencies=config["output_data"]["tf_to_gene_adjacencies"]
+    params:
+        temp_dir=lambda wildcards: config["params_general"]["temp_dir"],
+        method=lambda wildcards: config["params_inference"]["tf_to_gene_importance_method"],
+        seed=lambda wildcards: config["params_general"]["seed"]
+    threads: config["params_general"]["n_cpu"]
+    shell:
+        """
+        scenicplus grn_inference TF_to_gene \
+            --multiome_mudata_fname {input.multiome_mudata_fname} \
+            --tf_names {input.tf_names} \
+            --temp_dir {params.temp_dir} \
+            --out_tf_to_gene_adjacencies {output.tf_to_gene_adjacencies} \
+            --method {params.method} \
+            --n_cpu {threads} \
+            --seed {params.seed}
+        """
+
+rule region_to_gene:
+    input:
+        multiome_mudata_fname=config["input_data"]["combined_GEX_ACC_mudata"],
+        search_space=config["input_data"]["search_space"],
+    output:
+        region_to_gene_adjacencies=config["output_data"]["region_to_gene_adjacencies"]
+    params:
+        temp_dir=lambda wildcards: config["params_general"]["temp_dir"],
+        method_importance=lambda wildcards: config["params_inference"]["region_to_gene_importance_method"],
+        method_correlation=lambda wildcards: config["params_inference"]["region_to_gene_correlation_method"],
+    threads: config["params_general"]["n_cpu"]
+    shell:
+        """
+        scenicplus grn_inference region_to_gene \
+            --multiome_mudata_fname {input.multiome_mudata_fname} \
+            --search_space_fname {input.search_space} \
+            --temp_dir {params.temp_dir} \
+            --out_region_to_gene_adjacencies {output.region_to_gene_adjacencies} \
+            --importance_scoring_method {params.method_importance} \
+            --correlation_scoring_method {params.method_correlation} \
+            --n_cpu {threads}
+        """
+
+rule eGRN_direct:
+    input:
+        tf_to_gene_adjacencies=config["output_data"]["tf_to_gene_adjacencies"],
+        region_to_gene_adjacencies=config["output_data"]["region_to_gene_adjacencies"],
+        cistromes_direct=config["input_data"]["cistromes_direct"],
+        ranking_db_fname=config["input_data"]["ctx_db_fname"]
+    output:
+        eRegulons_direct=config["output_data"]["eRegulons_direct"]
+    params:
+        temp_dir=lambda wildcards: config["params_general"]["temp_dir"],
+        order_regions_to_genes_by=lambda wildcards: config["params_inference"]["order_regions_to_genes_by"],
+        order_TFs_to_genes_by=lambda wildcards: config["params_inference"]["order_TFs_to_genes_by"],
+        gsea_n_perm=lambda wildcards: config["params_inference"]["gsea_n_perm"],
+        quantiles=lambda wildcards: config["params_inference"]["quantile_thresholds_region_to_gene"],
+        top_n_regionTogenes_per_gene=lambda wildcards: config["params_inference"]["top_n_regionTogenes_per_gene"],
+        top_n_regionTogenes_per_region=lambda wildcards: config["params_inference"]["top_n_regionTogenes_per_region"],
+        min_regions_per_gene=lambda wildcards: config["params_inference"]["min_regions_per_gene"],
+        rho_threshold=lambda wildcards: config["params_inference"]["rho_threshold"],
+        min_target_genes=lambda wildcards: config["params_inference"]["min_target_genes"]
+    threads: config["params_general"]["n_cpu"]
+    shell:
+        """
+        scenicplus grn_inference eGRN \
+            --TF_to_gene_adj_fname {input.tf_to_gene_adjacencies}\
+            --region_to_gene_adj_fname {input.region_to_gene_adjacencies} \
+            --cistromes_fname {input.cistromes_direct}\
+            --ranking_db_fname {input.ranking_db_fname} \
+            --eRegulon_out_fname {output.eRegulons_direct} \
+            --temp_dir {params.temp_dir} \
+            --order_regions_to_genes_by {params.order_regions_to_genes_by} \
+            --order_TFs_to_genes_by {params.order_TFs_to_genes_by} \
+            --gsea_n_perm {params.gsea_n_perm} \
+            --quantiles {params.quantiles} \
+            --top_n_regionTogenes_per_gene {params.top_n_regionTogenes_per_gene} \
+            --top_n_regionTogenes_per_region {params.top_n_regionTogenes_per_region} \
+            --min_regions_per_gene {params.min_regions_per_gene} \
+            --rho_threshold {params.rho_threshold} \
+            --min_target_genes {params.min_target_genes} \
+            --n_cpu {threads}
+        """
+
+rule eGRN_extended:
+    input:
+        tf_to_gene_adjacencies=config["output_data"]["tf_to_gene_adjacencies"],
+        region_to_gene_adjacencies=config["output_data"]["region_to_gene_adjacencies"],
+        cistromes_extended=config["input_data"]["cistromes_extended"],
+        ranking_db_fname=config["input_data"]["ctx_db_fname"]
+    output:
+        eRegulons_extended=config["output_data"]["eRegulons_extended"]
+    params:
+        temp_dir=lambda wildcards: config["params_general"]["temp_dir"],
+        order_regions_to_genes_by=lambda wildcards: config["params_inference"]["order_regions_to_genes_by"],
+        order_TFs_to_genes_by=lambda wildcards: config["params_inference"]["order_TFs_to_genes_by"],
+        gsea_n_perm=lambda wildcards: config["params_inference"]["gsea_n_perm"],
+        quantiles=lambda wildcards: config["params_inference"]["quantile_thresholds_region_to_gene"],
+        top_n_regionTogenes_per_gene=lambda wildcards: config["params_inference"]["top_n_regionTogenes_per_gene"],
+        top_n_regionTogenes_per_region=lambda wildcards: config["params_inference"]["top_n_regionTogenes_per_region"],
+        min_regions_per_gene=lambda wildcards: config["params_inference"]["min_regions_per_gene"],
+        rho_threshold=lambda wildcards: config["params_inference"]["rho_threshold"],
+        min_target_genes=lambda wildcards: config["params_inference"]["min_target_genes"]
+    threads: config["params_general"]["n_cpu"]
+    shell:
+        """
+        scenicplus grn_inference eGRN \
+            --is_extended \
+            --TF_to_gene_adj_fname {input.tf_to_gene_adjacencies}\
+            --region_to_gene_adj_fname {input.region_to_gene_adjacencies} \
+            --cistromes_fname {input.cistromes_extended} \
+            --ranking_db_fname {input.ranking_db_fname} \
+            --eRegulon_out_fname {output.eRegulons_extended} \
+            --temp_dir {params.temp_dir} \
+            --order_regions_to_genes_by {params.order_regions_to_genes_by} \
+            --order_TFs_to_genes_by {params.order_TFs_to_genes_by} \
+            --gsea_n_perm {params.gsea_n_perm} \
+            --quantiles {params.quantiles} \
+            --top_n_regionTogenes_per_gene {params.top_n_regionTogenes_per_gene} \
+            --top_n_regionTogenes_per_region {params.top_n_regionTogenes_per_region} \
+            --min_regions_per_gene {params.min_regions_per_gene} \
+            --rho_threshold {params.rho_threshold} \
+            --min_target_genes {params.min_target_genes} \
+            --n_cpu {threads}
+        """
+rule AUCell_direct:
+    input:
+        eRegulons_direct=config["output_data"]["eRegulons_direct"],
+        multiome_mudata_fname=config["input_data"]["combined_GEX_ACC_mudata"],
+    output:
+        aucell_direct_out_fname=config["output_data"]["AUCell_direct"]
+    threads: config["params_general"]["n_cpu"]
+    shell:
+        """
+        scenicplus grn_inference AUCell \
+            --eRegulon_fname {input.eRegulons_direct} \
+            --multiome_mudata_fname {input.multiome_mudata_fname} \
+            --aucell_out_fname {output.aucell_direct_out_fname} \
+            --n_cpu {threads}
+        """
+
+rule AUCell_extended:
+    input:
+        eRegulons_extended=config["output_data"]["eRegulons_extended"],
+        multiome_mudata_fname=config["input_data"]["combined_GEX_ACC_mudata"],
+    output:
+        aucell_extended_out_fname=config["output_data"]["AUCell_extended"]
+    threads: config["params_general"]["n_cpu"]
+    shell:
+        """
+        scenicplus grn_inference AUCell \
+            --eRegulon_fname {input.eRegulons_extended} \
+            --multiome_mudata_fname {input.multiome_mudata_fname} \
+            --aucell_out_fname {output.aucell_extended_out_fname} \
+            --n_cpu {threads}
+        """
